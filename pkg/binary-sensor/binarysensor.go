@@ -1,7 +1,6 @@
 package binarysensor
 
 import (
-	"context"
 	"encoding/hex"
 	"fmt"
 	"strings"
@@ -18,48 +17,51 @@ const (
 	valueTrue            = 0x01
 )
 
-var esbClient client.EsbClient
-var esbAddress []byte
+type BinarySensor struct {
+	esbClient     client.EsbClient
+	esbAddress    []byte
+	subscriptions []subscription
+}
 
 // Open opens a connection to the esb-bridge RPC server.
 // Params:
 //   - deviceAddress: ESB device pipeline address in format xx:xx:xx:xx:xx
 //   - serverAddress: IP address of the esb-bridge server (e.g. "10.32.2.100", or "localhost")
 //   - serverPort : Port of the esb-bridge server (e.g. 9815)
-func Open(deviceAddress string, serverAddress string, serverPort uint) error {
+func (b *BinarySensor) Open(deviceAddress string, serverAddress string, serverPort uint) error {
 
 	// decode target address to bytes
 	addrBytes, err := hex.DecodeString(strings.ReplaceAll(deviceAddress, ":", ""))
 
 	if err != nil {
-		return fmt.Errorf("Invalid format for deviceAddress: %v", err)
+		return fmt.Errorf("invalid format for deviceAddress: %v", err)
 	}
 	if len(addrBytes) != 5 {
-		return fmt.Errorf("Invalid length for deviceAddress: need 5, got %v", len(addrBytes))
+		return fmt.Errorf("invalid length for deviceAddress: need 5, got %v", len(addrBytes))
 	}
-	esbAddress = addrBytes
+	b.esbAddress = addrBytes
 
-	err = esbClient.Connect(fmt.Sprintf("%v:%v", serverAddress, serverPort))
+	err = b.esbClient.Connect(fmt.Sprintf("%v:%v", serverAddress, serverPort))
 
 	return err
 }
 
 // Close closes the connection to the esb-bridge RPC server
-func Close() error {
-	err := esbClient.Disconnect()
+func (b *BinarySensor) Close() error {
+	err := b.esbClient.Disconnect()
 
 	return err
 }
 
 // SetValue sets the value of a specific channel
-func SetValue(channel uint8, value bool) error {
+func (b *BinarySensor) SetValue(channel uint8, value bool) error {
 
 	newVal := byte(valueFalse)
 
 	if value {
 		newVal = valueTrue
 	}
-	answerMsg, err := esbClient.Transfer(esbbridge.EsbMessage{Address: esbAddress, Cmd: cmdSetChannel, Payload: []byte{byte(channel), newVal}})
+	answerMsg, err := b.esbClient.Transfer(esbbridge.EsbMessage{Address: b.esbAddress, Cmd: cmdSetChannel, Payload: []byte{byte(channel), newVal}})
 
 	if err != nil {
 		return fmt.Errorf("ESB Transfer error: %v", err)
@@ -71,9 +73,9 @@ func SetValue(channel uint8, value bool) error {
 }
 
 // GetValue reads the current value of a specific channel
-func GetValue(channel uint8) (bool, error) {
+func (b *BinarySensor) GetValue(channel uint8) (bool, error) {
 
-	answerMsg, err := esbClient.Transfer(esbbridge.EsbMessage{Address: esbAddress, Cmd: cmdGetChannel, Payload: []byte{byte(channel)}})
+	answerMsg, err := b.esbClient.Transfer(esbbridge.EsbMessage{Address: b.esbAddress, Cmd: cmdGetChannel, Payload: []byte{byte(channel)}})
 
 	if err != nil {
 		return false, fmt.Errorf("ESB Transfer error: %v", err)
@@ -88,12 +90,4 @@ func GetValue(channel uint8) (bool, error) {
 	}
 
 	return channelVal, nil
-}
-
-// Subscribe subscribes to the selected channel of a binary sensor. Incoming sensor states
-// will be sent to the returned channel
-func Subscribe(channel uint8) (<-chan bool, error) {
-
-	ctx, cancel := context.WithCancel(context.Background())
-	esbClient.Listen(ctx, esbAddress, cmdStateNotification)
 }

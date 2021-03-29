@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"testing"
+	"time"
 )
 
 var (
@@ -14,14 +15,16 @@ var (
 	serverPort = flag.Uint("server_port", 9815, "The server port")
 )
 
+var b BinarySensor
+
 func setup() {
-	err := Open(*devAddr, *serverAddr, *serverPort)
+	err := b.Open(*devAddr, *serverAddr, *serverPort)
 	if err != nil {
 		log.Fatalf("Setup: Connection Error: %v", err)
 	}
 }
 func teardown() {
-	err := Close()
+	err := b.Close()
 	if err != nil {
 		fmt.Printf("Error while disconnection: %v)", err)
 
@@ -33,7 +36,7 @@ func TestGetValue(t *testing.T) {
 
 	testChannel := uint8(0)
 
-	val, err := GetValue(testChannel)
+	val, err := b.GetValue(testChannel)
 
 	if err != nil {
 		t.Fatalf("%v", err)
@@ -47,25 +50,39 @@ func TestSetValue(t *testing.T) {
 
 	testChannel := uint8(0)
 
-	err := SetValue(testChannel, false)
+	err := b.SetValue(testChannel, false)
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
 
-	valExpectedFalse, _ := GetValue(testChannel)
+	valExpectedFalse, _ := b.GetValue(testChannel)
 
-	err = SetValue(testChannel, true)
+	err = b.SetValue(testChannel, true)
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
 
-	valExpectedTrue, _ := GetValue(testChannel)
+	valExpectedTrue, _ := b.GetValue(testChannel)
 
 	if valExpectedFalse || !valExpectedTrue {
 		t.Fatalf("Unexpected values after set, got: %v (should be false), %v (should be true)", valExpectedFalse, valExpectedTrue)
 	}
 }
 
+func TestSubscribe(t *testing.T) {
+	s, err := b.Subscribe(0)
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
+
+	select {
+	case state := <-s.rxChan:
+		fmt.Printf("Incoming Sensor state for channel %v: %v", s.channel, state)
+	case <-time.After(10 * time.Second):
+		t.Fatal("Timeout", err)
+	}
+
+}
 func TestMain(m *testing.M) {
 	setup()
 	code := m.Run()
