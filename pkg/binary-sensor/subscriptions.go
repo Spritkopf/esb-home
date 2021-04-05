@@ -20,7 +20,7 @@ type subscription struct {
 }
 
 // Subscribe subscribes to the selected channel of a binary sensor. Incoming sensor states will be sent to
-// the returned channel
+// the channel rxChan in the returned subscription structure.
 func (b *BinarySensor) Subscribe(channel uint8) (*subscription, error) {
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -29,8 +29,6 @@ func (b *BinarySensor) Subscribe(channel uint8) (*subscription, error) {
 		rxChan:  make(chan bool, 1),
 		ctx:     ctx,
 		cancel:  cancel}
-
-	b.subscriptions = append(b.subscriptions, s)
 
 	esbMsgChan, err := b.esbClient.Listen(ctx, b.esbAddress, cmdStateNotification)
 
@@ -58,9 +56,8 @@ func (b *BinarySensor) Subscribe(channel uint8) (*subscription, error) {
 }
 
 // Unubscribe stops the subscription to the selected channel of a binary sensor.
-func (b *BinarySensor) Unubscribe(channel uint8) error {
+func (b *BinarySensor) Unubscribe(sub *subscription) error {
 
-	//ctx, cancel := context.WithCancel(context.Background())
-	//esbClient.Listen(ctx, esbAddress, cmdStateNotification)
+	sub.cancel()
 	return nil
 }

@@ -18,9 +18,8 @@ const (
 )
 
 type BinarySensor struct {
-	esbClient     client.EsbClient
-	esbAddress    []byte
-	subscriptions []subscription
+	esbClient  client.EsbClient
+	esbAddress []byte
 }
 
 // Open opens a connection to the esb-bridge RPC server.
